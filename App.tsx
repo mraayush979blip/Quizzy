@@ -388,16 +388,22 @@ const App: React.FC = () => {
   // --- BACKGROUND ANIMATION COMPONENT ---
   const BackgroundAnimation = () => (
     <div className="fixed inset-0 overflow-hidden pointer-events-none -z-10">
-        {/* Light Mode: Pastel Watercolor Effect */}
-        <div className="absolute inset-0 bg-gradient-to-br from-indigo-50 via-white to-purple-50 dark:hidden transition-colors duration-700"></div>
-        <div className="absolute top-[-10%] left-[-10%] w-[60vw] h-[60vw] bg-blue-300/30 rounded-full mix-blend-multiply filter blur-[80px] animate-blob dark:hidden"></div>
-        <div className="absolute top-[-10%] right-[-10%] w-[60vw] h-[60vw] bg-purple-300/30 rounded-full mix-blend-multiply filter blur-[80px] animate-blob animation-delay-2000 dark:hidden"></div>
-        <div className="absolute bottom-[-20%] left-[20%] w-[60vw] h-[60vw] bg-pink-300/30 rounded-full mix-blend-multiply filter blur-[80px] animate-blob animation-delay-4000 dark:hidden"></div>
-        
-        {/* Dark Mode: Deep Nebula Effect */}
-        <div className="hidden dark:block absolute inset-0 bg-[#0a0a0b]"></div>
-        <div className="hidden dark:block absolute top-[10%] left-[10%] w-[500px] h-[500px] bg-primary-600/10 rounded-full mix-blend-screen filter blur-[100px] animate-pulse-slow"></div>
-        <div className="hidden dark:block absolute bottom-[10%] right-[10%] w-[500px] h-[500px] bg-fuchsia-600/10 rounded-full mix-blend-screen filter blur-[100px] animate-pulse-slow animation-delay-2000"></div>
+      {/* Light Mode - Subtle Flowing Gradient */}
+      <div className="absolute inset-0 bg-gradient-to-r from-indigo-50 via-purple-50 to-pink-50 bg-[length:400%_400%] animate-subtle-flow dark:hidden"></div>
+      
+      {/* Floating Blobs for depth */}
+      <div className="absolute top-0 left-0 w-full h-full overflow-hidden dark:hidden opacity-70">
+         <div className="absolute top-[-10%] left-[-10%] w-[50vw] h-[50vw] bg-blue-200/20 rounded-full mix-blend-multiply filter blur-[90px] animate-blob"></div>
+         <div className="absolute top-[-10%] right-[-10%] w-[50vw] h-[50vw] bg-purple-200/20 rounded-full mix-blend-multiply filter blur-[90px] animate-blob animation-delay-2000"></div>
+         <div className="absolute bottom-[-20%] left-[20%] w-[50vw] h-[50vw] bg-pink-200/20 rounded-full mix-blend-multiply filter blur-[90px] animate-blob animation-delay-4000"></div>
+      </div>
+
+      {/* Dark Mode - Deep Nebula */}
+       <div className="hidden dark:block absolute inset-0 bg-zinc-950">
+           <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-primary-900/20 via-zinc-950 to-zinc-950"></div>
+           <div className="absolute top-[10%] left-[20%] w-[500px] h-[500px] bg-primary-900/10 rounded-full blur-[120px] animate-pulse"></div>
+           <div className="absolute bottom-[10%] right-[20%] w-[500px] h-[500px] bg-fuchsia-900/10 rounded-full blur-[120px] animate-pulse animation-delay-2000"></div>
+      </div>
     </div>
   );
 
