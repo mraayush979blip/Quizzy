@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect, useRef } from 'react';
-import { BookOpen, History as HistoryIcon, LogOut, Sparkles, ArrowLeft, Trash2, Moon, Sun, BrainCircuit, Lock, Mail, AlertCircle, Settings, Copy, UserCircle, Upload, FileText, X, Check } from 'lucide-react';
+import { BookOpen, History as HistoryIcon, LogOut, Sparkles, ArrowLeft, Trash2, Moon, Sun, BrainCircuit, Lock, Mail, AlertCircle, Settings, Copy, UserCircle, Upload, FileText, X, Check, Zap } from 'lucide-react';
 import { StudyGoal, StudySession, User, ViewState, Theme, Difficulty, FileData } from './types';
 import { generateStudyContent } from './services/geminiService';
 import { STORAGE_KEY_THEME, STORAGE_KEY_HISTORY } from './constants';
@@ -148,7 +148,7 @@ const App: React.FC = () => {
     document.documentElement.classList.toggle('dark', newTheme === 'dark');
   };
 
-  const handleGuestLogin = () => {
+  const handleGuestLogin = (delay = 800) => {
     setAuthLoading(true);
     setTimeout(() => {
         setUser({
@@ -158,7 +158,7 @@ const App: React.FC = () => {
         });
         setView('GENERATOR');
         setAuthLoading(false);
-    }, 800);
+    }, delay);
   };
 
   // Auth Handlers
@@ -181,6 +181,23 @@ const App: React.FC = () => {
     } catch (err: any) {
       // Handle known auth errors gracefully without cluttering console
       const errorCode = err.code;
+      const errorMsg = err.message || '';
+      
+      // CRITICAL: Handle Configuration Errors by Silently Falling Back to Guest
+      if (
+          errorCode === 'auth/api-key-not-valid.-please-pass-a-valid-api-key.' || 
+          errorCode === 'auth/invalid-api-key' || 
+          errorCode === 'auth/configuration-not-found' || 
+          errorCode === 'auth/operation-not-allowed' ||
+          errorCode === 'auth/requests-from-referer-blocked' ||
+          errorMsg.includes('identity-toolkit')
+      ) {
+        console.warn("Firebase Config Issue (Falling back to Guest):", errorCode || errorMsg); 
+        handleGuestLogin(100); // Immediate fallback
+        return;
+      }
+
+      // Handle standard user errors
       let errorMessage = "Authentication failed. Please try again.";
       
       if (errorCode === 'auth/invalid-credential' || errorCode === 'auth/user-not-found' || errorCode === 'auth/wrong-password') {
@@ -192,25 +209,19 @@ const App: React.FC = () => {
         errorMessage = "Password must be at least 6 characters.";
       } else if (errorCode === 'auth/network-request-failed') {
         errorMessage = "Network error. Check your internet connection.";
-      } else if (
-          errorCode === 'auth/api-key-not-valid.-please-pass-a-valid-api-key.' || 
-          errorCode === 'auth/invalid-api-key' || 
-          errorCode === 'auth/configuration-not-found' || 
-          errorCode === 'auth/operation-not-allowed'
-      ) {
-        console.warn("Firebase Config Error:", errorCode); // Keep warn for dev debugging
-        errorMessage = "Login unavailable. Enabling Guest Mode...";
-        setAuthError(errorMessage);
-        setTimeout(() => handleGuestLogin(), 1500);
-        return;
       } else {
-        console.error("Auth Error:", err); // Log unknown errors
+        console.error("Auth Error:", err);
         errorMessage = err.message;
       }
       
       setAuthError(errorMessage);
     } finally {
-        if (auth) setAuthLoading(false);
+        // Only clear loading if we didn't trigger guest fallback
+        if (auth) {
+           setTimeout(() => {
+                if (!user) setAuthLoading(false);
+           }, 50);
+        }
     }
   };
 
@@ -228,7 +239,6 @@ const App: React.FC = () => {
       setDifficulty(Difficulty.MEDIUM);
       setQuestionCount(5);
       setSelectedFile(null);
-      // Don't clear history state here; let the useEffect handle it when user changes
     } catch (err) {
       console.error("Logout error:", err);
     }
@@ -242,7 +252,6 @@ const App: React.FC = () => {
     const reader = new FileReader();
     reader.onloadend = () => {
       const base64String = reader.result as string;
-      // Remove the data URL prefix (e.g., "data:image/jpeg;base64,")
       const base64Data = base64String.split(',')[1];
       
       setSelectedFile({
@@ -269,7 +278,6 @@ const App: React.FC = () => {
     setCurrentResult(null);
 
     try {
-      // Use a default topic if only a file is provided
       const finalTopic = topic.trim() || (selectedFile ? "the provided document" : "General Knowledge");
 
       const generatedText = await generateStudyContent({
@@ -291,7 +299,6 @@ const App: React.FC = () => {
       let id = 'temp-' + Date.now();
       let savedToDb = false;
 
-      // Attempt to save to Firestore
       if (db && user.uid !== 'guest-user' && isDbAvailable) {
         try {
            const docRef = await addDoc(collection(db, 'users', user.uid, 'history'), newSessionData);
@@ -300,12 +307,11 @@ const App: React.FC = () => {
         } catch (dbErr: any) {
           console.warn("Failed to save to DB, falling back to local:", dbErr.code);
           if (dbErr.code === 'not-found' || dbErr.code === 'unavailable') {
-             setIsDbAvailable(false); // Switch to local mode for future ops
+             setIsDbAvailable(false);
           }
         }
       } 
       
-      // Update State (which triggers LocalStorage save via useEffect if !isDbAvailable)
       const newSession: StudySession = { id, ...newSessionData };
       
       if (!savedToDb) {
@@ -347,14 +353,14 @@ const App: React.FC = () => {
         const imageMatch = part.match(/!\[(.*?)\]\((.*?)\)/);
         if (imageMatch) {
             return (
-                <div key={index} className="my-6 rounded-xl overflow-hidden shadow-md border border-slate-200 dark:border-slate-700">
+                <div key={index} className="my-8 rounded-2xl overflow-hidden shadow-xl border border-zinc-200 dark:border-white/10 relative group">
                     <img 
                         src={imageMatch[2]} 
                         alt={imageMatch[1]} 
-                        className="w-full h-auto object-cover max-h-96 hover:scale-105 transition-transform duration-700" 
+                        className="w-full h-auto object-cover max-h-96 transition-transform duration-700 group-hover:scale-105" 
                         loading="lazy"
                     />
-                    {imageMatch[1] && <div className="bg-slate-50 dark:bg-slate-900 p-2 text-xs text-center text-slate-500 italic">{imageMatch[1]}</div>}
+                    {imageMatch[1] && <div className="absolute bottom-0 left-0 right-0 bg-black/60 backdrop-blur-md p-3 text-xs text-center text-zinc-200 italic">{imageMatch[1]}</div>}
                 </div>
             );
         }
@@ -370,8 +376,8 @@ const App: React.FC = () => {
         return <FlashcardPlayer data={session.result} />;
       default:
         return (
-          <div className="prose prose-indigo dark:prose-invert max-w-none font-sans">
-            <div className="whitespace-pre-wrap text-slate-700 dark:text-slate-300 leading-relaxed text-lg">
+          <div className="prose prose-lg prose-zinc dark:prose-invert max-w-none font-sans leading-loose">
+            <div className="whitespace-pre-wrap text-zinc-700 dark:text-zinc-300">
                {renderMarkdownWithImages(session.result)}
             </div>
           </div>
@@ -379,103 +385,116 @@ const App: React.FC = () => {
     }
   };
 
+  // --- BACKGROUND ANIMATION COMPONENT ---
+  const BackgroundAnimation = () => (
+    <div className="fixed inset-0 overflow-hidden pointer-events-none -z-10">
+        {/* Light Mode: Pastel Watercolor Effect */}
+        <div className="absolute inset-0 bg-gradient-to-br from-indigo-50 via-white to-purple-50 dark:hidden transition-colors duration-700"></div>
+        <div className="absolute top-[-10%] left-[-10%] w-[60vw] h-[60vw] bg-blue-300/30 rounded-full mix-blend-multiply filter blur-[80px] animate-blob dark:hidden"></div>
+        <div className="absolute top-[-10%] right-[-10%] w-[60vw] h-[60vw] bg-purple-300/30 rounded-full mix-blend-multiply filter blur-[80px] animate-blob animation-delay-2000 dark:hidden"></div>
+        <div className="absolute bottom-[-20%] left-[20%] w-[60vw] h-[60vw] bg-pink-300/30 rounded-full mix-blend-multiply filter blur-[80px] animate-blob animation-delay-4000 dark:hidden"></div>
+        
+        {/* Dark Mode: Deep Nebula Effect */}
+        <div className="hidden dark:block absolute inset-0 bg-[#0a0a0b]"></div>
+        <div className="hidden dark:block absolute top-[10%] left-[10%] w-[500px] h-[500px] bg-primary-600/10 rounded-full mix-blend-screen filter blur-[100px] animate-pulse-slow"></div>
+        <div className="hidden dark:block absolute bottom-[10%] right-[10%] w-[500px] h-[500px] bg-fuchsia-600/10 rounded-full mix-blend-screen filter blur-[100px] animate-pulse-slow animation-delay-2000"></div>
+    </div>
+  );
+
   // View Components
   const renderAuth = () => (
-    <div className="min-h-screen flex items-center justify-center bg-slate-50 dark:bg-slate-900 px-4 transition-colors duration-300 font-sans">
-      <div className="absolute top-4 right-4">
-        <button onClick={toggleTheme} className="p-2 rounded-full bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 shadow-sm hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors">
+    <div className="min-h-screen flex items-center justify-center px-4 font-sans relative">
+      <BackgroundAnimation />
+      
+      <div className="absolute top-6 right-6 z-20">
+        <button onClick={toggleTheme} className="p-3 rounded-full bg-white/40 dark:bg-white/10 backdrop-blur-md border border-white/50 dark:border-white/10 text-zinc-700 dark:text-zinc-300 hover:bg-white/60 transition-all shadow-sm">
           {theme === 'light' ? <Moon size={20} /> : <Sun size={20} />}
         </button>
       </div>
-      <div className="max-w-md w-full bg-white dark:bg-slate-800 rounded-3xl shadow-2xl shadow-indigo-500/10 border border-slate-100 dark:border-slate-700 p-8 sm:p-10 animate-slide-up">
-        <div className="text-center mb-8">
-          <div className="bg-gradient-to-br from-indigo-600 to-purple-700 w-20 h-20 rounded-2xl flex items-center justify-center mx-auto mb-6 shadow-lg shadow-indigo-500/30 transform rotate-3 hover:rotate-0 transition-transform duration-300">
-            <BrainCircuit className="w-10 h-10 text-white" />
+      
+      <div className="max-w-md w-full glass-panel rounded-[2.5rem] shadow-2xl p-8 sm:p-12 animate-slide-up relative z-10">
+        <div className="text-center mb-10">
+          <div className="bg-gradient-to-tr from-primary-600 to-fuchsia-500 w-24 h-24 rounded-3xl flex items-center justify-center mx-auto mb-6 shadow-xl shadow-primary-500/30 transform rotate-6 hover:rotate-0 transition-transform duration-500">
+            <BrainCircuit className="w-12 h-12 text-white" />
           </div>
-          <h1 className="text-4xl font-serif font-bold text-slate-900 dark:text-white tracking-tight mb-2">Quizzy</h1>
-          <p className="text-slate-500 dark:text-slate-400 text-lg font-light">
-            Master any topic instantly.
+          <h1 className="text-5xl font-display font-bold text-zinc-900 dark:text-white tracking-tighter mb-3">Quizzy</h1>
+          <p className="text-zinc-600 dark:text-zinc-400 text-lg font-medium">
+            Your AI Learning Companion
           </p>
         </div>
 
-        <form onSubmit={handleAuth} className="space-y-5">
-          <div className="space-y-4">
+        <form onSubmit={handleAuth} className="space-y-6">
+          <div className="space-y-5">
             <div>
-                <label className="block text-sm font-bold text-slate-700 dark:text-slate-300 mb-2 ml-1">
-                Email
-                </label>
                 <div className="relative group">
-                <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
-                    <Mail className="h-5 w-5 text-slate-400 group-focus-within:text-indigo-500 transition-colors" />
-                </div>
-                <input
-                    type="email"
-                    required
-                    value={email}
-                    onChange={(e) => {
-                        setEmail(e.target.value);
-                        setAuthError(null); // Clear error on type
-                    }}
-                    className="w-full pl-11 pr-4 py-3.5 bg-slate-50 dark:bg-slate-900/50 border border-slate-200 dark:border-slate-700 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none transition-all dark:text-white font-medium"
-                    placeholder="hello@example.com"
-                />
+                    <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
+                        <Mail className="h-5 w-5 text-zinc-400 group-focus-within:text-primary-500 transition-colors" />
+                    </div>
+                    <input
+                        type="email"
+                        required
+                        value={email}
+                        onChange={(e) => {
+                            setEmail(e.target.value);
+                            setAuthError(null);
+                        }}
+                        className="w-full pl-11 pr-4 py-4 bg-white/50 dark:bg-black/20 border border-zinc-200/80 dark:border-white/10 rounded-2xl focus:ring-2 focus:ring-primary-500 focus:border-primary-500 outline-none transition-all dark:text-white font-medium placeholder:text-zinc-400/70 backdrop-blur-sm text-lg"
+                        placeholder="Email Address"
+                    />
                 </div>
             </div>
 
             <div>
-                <label className="block text-sm font-bold text-slate-700 dark:text-slate-300 mb-2 ml-1">
-                Password
-                </label>
                 <div className="relative group">
-                <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
-                    <Lock className="h-5 w-5 text-slate-400 group-focus-within:text-indigo-500 transition-colors" />
-                </div>
-                <input
-                    type="password"
-                    required
-                    value={password}
-                    onChange={(e) => {
-                        setPassword(e.target.value);
-                        setAuthError(null); // Clear error on type
-                    }}
-                    className="w-full pl-11 pr-4 py-3.5 bg-slate-50 dark:bg-slate-900/50 border border-slate-200 dark:border-slate-700 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none transition-all dark:text-white font-medium"
-                    placeholder="••••••••"
-                    minLength={6}
-                />
+                    <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
+                        <Lock className="h-5 w-5 text-zinc-400 group-focus-within:text-primary-500 transition-colors" />
+                    </div>
+                    <input
+                        type="password"
+                        required
+                        value={password}
+                        onChange={(e) => {
+                            setPassword(e.target.value);
+                            setAuthError(null);
+                        }}
+                        className="w-full pl-11 pr-4 py-4 bg-white/50 dark:bg-black/20 border border-zinc-200/80 dark:border-white/10 rounded-2xl focus:ring-2 focus:ring-primary-500 focus:border-primary-500 outline-none transition-all dark:text-white font-medium placeholder:text-zinc-400/70 backdrop-blur-sm text-lg"
+                        placeholder="Password"
+                        minLength={6}
+                    />
                 </div>
             </div>
           </div>
 
           {authError && (
-            <div className="p-4 rounded-xl bg-red-50 dark:bg-red-900/20 border border-red-100 dark:border-red-900/30 text-red-600 dark:text-red-400 text-sm flex items-start animate-fade-in">
+            <div className="p-4 rounded-2xl bg-red-50 border border-red-100 text-red-600 dark:bg-red-900/20 dark:border-red-900/30 dark:text-red-300 text-sm flex items-start animate-fade-in">
               <AlertCircle className="w-5 h-5 mr-2 flex-shrink-0 mt-0.5" />
-              <span className="leading-tight">{authError}</span>
+              <span className="leading-tight font-medium">{authError}</span>
             </div>
           )}
 
-          <Button type="submit" isLoading={authLoading} className="w-full h-14 text-lg font-bold rounded-xl shadow-xl shadow-indigo-500/20 hover:shadow-indigo-500/30 hover:-translate-y-0.5">
+          <Button type="submit" isLoading={authLoading} className="w-full h-16 text-lg rounded-2xl shadow-xl shadow-primary-500/25 hover:shadow-primary-500/40 hover:-translate-y-1">
             {isSignUp ? "Create Account" : "Sign In"}
           </Button>
         </form>
 
-        <div className="mt-6 pt-6 border-t border-slate-100 dark:border-slate-700 text-center space-y-4">
+        <div className="mt-8 pt-8 border-t border-zinc-200/60 dark:border-white/10 text-center space-y-4">
            <button 
             type="button"
-            onClick={handleGuestLogin}
-            className="w-full py-3 rounded-xl border-2 border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 font-bold hover:bg-slate-50 dark:hover:bg-slate-700 transition-all flex items-center justify-center"
+            onClick={() => handleGuestLogin()}
+            className="w-full py-4 rounded-2xl border border-zinc-200 dark:border-white/10 bg-white/30 dark:bg-white/5 text-zinc-600 dark:text-zinc-300 font-bold hover:bg-white/60 dark:hover:bg-white/10 transition-all flex items-center justify-center backdrop-blur-sm"
            >
               <UserCircle className="w-5 h-5 mr-2" />
               Continue as Guest
            </button>
 
-          <p className="text-sm text-slate-500 dark:text-slate-400">
+          <p className="text-sm text-zinc-500 dark:text-zinc-500 font-medium">
             {isSignUp ? "Already have an account? " : "Don't have an account? " }
             <button 
               onClick={() => {
                 setIsSignUp(!isSignUp);
                 setAuthError(null);
               }} 
-              className="font-bold text-indigo-600 dark:text-indigo-400 hover:text-indigo-500 transition-colors underline decoration-2 underline-offset-2 decoration-indigo-200 dark:decoration-indigo-900 hover:decoration-indigo-500"
+              className="font-bold text-primary-600 dark:text-primary-400 hover:text-primary-500 transition-colors"
             >
               {isSignUp ? "Log In" : "Sign Up"}
             </button>
@@ -486,21 +505,21 @@ const App: React.FC = () => {
   );
 
   const renderHeader = () => (
-    <header className="bg-white/80 dark:bg-slate-900/80 backdrop-blur-md border-b border-slate-200 dark:border-slate-800 sticky top-0 z-20 transition-colors duration-300">
-      <div className="max-w-5xl mx-auto px-4 sm:px-6 h-16 flex items-center justify-between">
-        <div className="flex items-center space-x-2 cursor-pointer group" onClick={() => setView('GENERATOR')}>
-          <div className="bg-indigo-600 dark:bg-indigo-500 p-1.5 rounded-lg group-hover:scale-105 transition-transform">
-            <BrainCircuit className="w-6 h-6 text-white" />
+    <header className="glass-panel border-b border-white/20 dark:border-white/5 sticky top-0 z-50 transition-colors duration-300">
+      <div className="max-w-6xl mx-auto px-4 sm:px-6 h-20 flex items-center justify-between">
+        <div className="flex items-center space-x-3 cursor-pointer group" onClick={() => setView('GENERATOR')}>
+          <div className="bg-gradient-to-tr from-primary-600 to-fuchsia-500 p-2.5 rounded-xl shadow-lg shadow-primary-500/20 group-hover:scale-110 transition-transform duration-300">
+            <BrainCircuit className="w-5 h-5 text-white" />
           </div>
-          <span className="font-serif font-bold text-2xl text-slate-900 dark:text-white tracking-tight">Quizzy</span>
+          <span className="font-display font-bold text-2xl text-zinc-900 dark:text-white tracking-tight">Quizzy</span>
         </div>
         
         <div className="flex items-center space-x-3 sm:space-x-4">
            <button 
             onClick={toggleTheme} 
-            className="p-2 rounded-full text-slate-500 hover:bg-slate-100 dark:text-slate-400 dark:hover:bg-slate-800 transition-colors"
+            className="p-2.5 rounded-full text-zinc-600 hover:bg-zinc-100/50 dark:text-zinc-400 dark:hover:bg-white/10 transition-colors border border-transparent hover:border-zinc-200 dark:hover:border-white/5"
           >
-            {theme === 'light' ? <Moon size={18} /> : <Sun size={18} />}
+            {theme === 'light' ? <Moon size={20} /> : <Sun size={20} />}
           </button>
 
           {view === 'GENERATOR' && (
@@ -526,15 +545,15 @@ const App: React.FC = () => {
             </Button>
           )}
           
-          <div className="h-6 w-px bg-slate-200 dark:bg-slate-700 mx-2"></div>
+          <div className="h-8 w-px bg-zinc-200 dark:bg-white/10 mx-2"></div>
           
           <div className="flex items-center space-x-3">
-            <span className="text-sm text-slate-600 dark:text-slate-400 hidden md:inline font-bold truncate max-w-[150px]">
+            <span className="text-sm text-zinc-600 dark:text-zinc-400 hidden md:inline font-semibold truncate max-w-[150px]">
                 {user?.uid === 'guest-user' ? 'Guest Mode' : user?.email}
             </span>
             <button 
               onClick={handleLogout}
-              className="text-slate-400 hover:text-red-500 dark:hover:text-red-400 transition-colors p-1"
+              className="text-zinc-400 hover:text-red-500 dark:hover:text-red-400 transition-colors p-2 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-xl"
               title="Log Out"
             >
               <LogOut className="w-5 h-5" />
@@ -546,61 +565,66 @@ const App: React.FC = () => {
   );
 
   const renderGenerator = () => (
-    <div className="max-w-3xl mx-auto px-4 py-8 space-y-8 font-sans">
-      <div className="bg-white dark:bg-slate-800 rounded-3xl shadow-sm border border-slate-200 dark:border-slate-700 p-6 sm:p-10 transition-colors duration-300">
-        <div className="mb-8">
-          <h2 className="text-2xl font-serif font-bold text-slate-900 dark:text-white flex items-center">
-            <Sparkles className="w-6 h-6 mr-3 text-amber-500 fill-amber-500" />
+    <div className="max-w-4xl mx-auto px-4 py-12 space-y-8 font-sans relative z-10">
+      <div className="glass-panel rounded-[2rem] shadow-xl p-8 sm:p-12 transition-all duration-300 border-t border-white/60">
+        <div className="mb-10">
+          <h2 className="text-3xl font-display font-bold text-zinc-900 dark:text-white flex items-center">
+            <span className="bg-amber-100 dark:bg-amber-900/30 p-2 rounded-xl mr-4">
+                <Sparkles className="w-6 h-6 text-amber-500 fill-amber-500/20" />
+            </span>
             What do you want to learn?
           </h2>
+          <p className="text-zinc-500 dark:text-zinc-400 mt-3 ml-[4.5rem] text-lg">Enter a topic or upload a document to get started.</p>
         </div>
 
         <form onSubmit={handleGenerate} className="space-y-8">
           <div>
-            <label htmlFor="topic" className="block text-sm font-bold text-slate-700 dark:text-slate-300 mb-3 uppercase tracking-wide">
+            <label htmlFor="topic" className="block text-xs font-bold text-zinc-500 dark:text-zinc-400 mb-3 uppercase tracking-widest">
               Topic or Concept
             </label>
-            <input
-              type="text"
-              id="topic"
-              value={topic}
-              onChange={(e) => setTopic(e.target.value)}
-              placeholder="e.g., The Solar System, React Hooks, Spanish Verbs"
-              className="w-full px-5 py-4 text-lg bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-2xl focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none transition-all dark:text-white shadow-inner"
-              required={!selectedFile}
-            />
+            <div className="relative group">
+              <input
+                type="text"
+                id="topic"
+                value={topic}
+                onChange={(e) => setTopic(e.target.value)}
+                placeholder="e.g., Quantum Physics, The French Revolution"
+                className="w-full px-6 py-5 text-lg bg-white/60 dark:bg-black/40 border border-zinc-200 dark:border-white/10 rounded-2xl focus:ring-2 focus:ring-primary-500 focus:border-primary-500 outline-none transition-all dark:text-white shadow-sm placeholder:text-zinc-400 backdrop-blur-sm"
+                required={!selectedFile}
+              />
+            </div>
           </div>
 
            {/* File Upload Section */}
            <div>
-             <label className="block text-sm font-bold text-slate-700 dark:text-slate-300 mb-3 uppercase tracking-wide flex items-center">
+             <label className="block text-xs font-bold text-zinc-500 dark:text-zinc-400 mb-3 uppercase tracking-widest flex items-center">
                 <Upload className="w-4 h-4 mr-2" />
-                Upload Document (Optional)
+                Source Material (Optional)
              </label>
              
              {!selectedFile ? (
                  <div 
                     onClick={() => fileInputRef.current?.click()}
-                    className="border-2 border-dashed border-slate-300 dark:border-slate-600 rounded-2xl p-8 text-center cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-700/50 transition-colors"
+                    className="border-2 border-dashed border-zinc-300/70 dark:border-white/10 rounded-2xl p-8 text-center cursor-pointer hover:bg-white/40 dark:hover:bg-white/5 transition-colors group"
                  >
-                    <div className="w-12 h-12 bg-slate-100 dark:bg-slate-700 rounded-full flex items-center justify-center mx-auto mb-3">
-                        <FileText className="w-6 h-6 text-slate-400" />
+                    <div className="w-16 h-16 bg-zinc-100 dark:bg-white/5 rounded-full flex items-center justify-center mx-auto mb-4 group-hover:scale-110 transition-transform duration-300">
+                        <FileText className="w-8 h-8 text-zinc-400 group-hover:text-primary-500 transition-colors" />
                     </div>
-                    <p className="text-slate-600 dark:text-slate-400 font-medium">Click to upload PDF or Image</p>
-                    <p className="text-slate-400 dark:text-slate-500 text-sm mt-1">We'll use this as source material</p>
+                    <p className="text-zinc-700 dark:text-zinc-200 font-bold text-lg">Click to upload PDF or Image</p>
+                    <p className="text-zinc-400 dark:text-zinc-500 text-sm mt-1">AI will analyze this content to generate questions</p>
                  </div>
              ) : (
-                 <div className="flex items-center justify-between p-4 bg-indigo-50 dark:bg-indigo-900/20 border border-indigo-100 dark:border-indigo-900/30 rounded-2xl">
+                 <div className="flex items-center justify-between p-4 bg-primary-50 dark:bg-primary-900/20 border border-primary-100 dark:border-primary-700/50 rounded-2xl backdrop-blur-sm">
                     <div className="flex items-center overflow-hidden">
-                        <div className="w-10 h-10 bg-white dark:bg-slate-800 rounded-xl flex items-center justify-center flex-shrink-0 mr-3">
-                            <FileText className="w-5 h-5 text-indigo-600 dark:text-indigo-400" />
+                        <div className="w-12 h-12 bg-white dark:bg-primary-600/20 rounded-xl flex items-center justify-center flex-shrink-0 mr-4 shadow-sm">
+                            <FileText className="w-6 h-6 text-primary-600 dark:text-primary-400" />
                         </div>
-                        <span className="font-medium text-slate-700 dark:text-slate-200 truncate">{selectedFile.name}</span>
+                        <span className="font-medium text-zinc-800 dark:text-zinc-100 truncate text-lg">{selectedFile.name}</span>
                     </div>
                     <button 
                         type="button"
                         onClick={clearFile}
-                        className="p-2 hover:bg-white dark:hover:bg-slate-800 rounded-full transition-colors text-slate-500 hover:text-red-500"
+                        className="p-2.5 hover:bg-white dark:hover:bg-white/10 rounded-full transition-colors text-zinc-400 hover:text-red-500"
                     >
                         <X className="w-5 h-5" />
                     </button>
@@ -616,21 +640,24 @@ const App: React.FC = () => {
            </div>
 
           <div>
-            <label htmlFor="goal" className="block text-sm font-bold text-slate-700 dark:text-slate-300 mb-3 uppercase tracking-wide">
+            <label htmlFor="goal" className="block text-xs font-bold text-zinc-500 dark:text-zinc-400 mb-3 uppercase tracking-widest">
               Learning Mode
             </label>
-            <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
               {Object.values(StudyGoal).map((g) => (
                 <button
                   key={g}
                   type="button"
                   onClick={() => setGoal(g)}
-                  className={`px-4 py-4 text-sm font-bold rounded-xl border transition-all duration-200 flex items-center justify-center text-center
+                  className={`px-4 py-4 text-sm font-bold rounded-2xl border transition-all duration-300 flex items-center justify-center text-center relative overflow-hidden shadow-sm
                     ${goal === g 
-                      ? 'border-indigo-600 bg-indigo-600 text-white shadow-lg shadow-indigo-500/30 transform scale-[1.02]' 
-                      : 'border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-700 bg-white dark:bg-slate-800 hover:border-slate-300 dark:hover:border-slate-600'
+                      ? 'border-transparent text-white shadow-lg shadow-primary-500/30 transform scale-[1.02]' 
+                      : 'border-zinc-200/60 dark:border-white/10 text-zinc-600 dark:text-zinc-400 hover:bg-white dark:hover:bg-white/5 bg-white/40 dark:bg-black/20'
                     }`}
                 >
+                  {goal === g && (
+                    <div className="absolute inset-0 bg-gradient-to-r from-primary-600 to-fuchsia-500 -z-10"></div>
+                  )}
                   {g}
                 </button>
               ))}
@@ -639,28 +666,28 @@ const App: React.FC = () => {
 
           {/* Conditional Quiz/Flashcard Options */}
           {(goal === StudyGoal.QUIZ || goal === StudyGoal.FLASHCARDS) && (
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-6 animate-fade-in">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-6 animate-fade-in p-6 bg-zinc-50/60 dark:bg-black/20 rounded-2xl border border-zinc-200/50 dark:border-white/5">
                   <div>
-                    <label className="block text-sm font-bold text-slate-700 dark:text-slate-300 mb-3 uppercase tracking-wide">
+                    <label className="block text-xs font-bold text-zinc-500 dark:text-zinc-400 mb-3 uppercase tracking-widest">
                         Difficulty
                     </label>
                     <div className="relative">
                         <select
                             value={difficulty}
                             onChange={(e) => setDifficulty(e.target.value as Difficulty)}
-                            className="w-full appearance-none px-4 py-3 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none text-slate-700 dark:text-white font-medium"
+                            className="w-full appearance-none px-4 py-3.5 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700 rounded-xl focus:ring-2 focus:ring-primary-500 outline-none text-zinc-700 dark:text-white font-medium shadow-sm"
                         >
                             {Object.values(Difficulty).map((d) => (
                                 <option key={d} value={d}>{d}</option>
                             ))}
                         </select>
-                        <div className="absolute inset-y-0 right-0 flex items-center px-4 pointer-events-none text-slate-500">
+                        <div className="absolute inset-y-0 right-0 flex items-center px-4 pointer-events-none text-zinc-500">
                             <Settings className="w-4 h-4" />
                         </div>
                     </div>
                   </div>
                   <div>
-                    <label className="block text-sm font-bold text-slate-700 dark:text-slate-300 mb-3 uppercase tracking-wide">
+                    <label className="block text-xs font-bold text-zinc-500 dark:text-zinc-400 mb-3 uppercase tracking-widest">
                         {goal === StudyGoal.QUIZ ? 'Number of Questions' : 'Number of Cards'}
                     </label>
                     <div className="flex space-x-2">
@@ -669,10 +696,10 @@ const App: React.FC = () => {
                                 key={num}
                                 type="button"
                                 onClick={() => setQuestionCount(num)}
-                                className={`flex-1 py-3 rounded-xl font-bold border transition-colors ${
+                                className={`flex-1 py-3.5 rounded-xl font-bold border transition-colors shadow-sm ${
                                     questionCount === num
-                                    ? 'bg-indigo-100 dark:bg-indigo-900/40 border-indigo-500 text-indigo-700 dark:text-indigo-300'
-                                    : 'bg-slate-50 dark:bg-slate-900 border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800'
+                                    ? 'bg-primary-100 dark:bg-primary-900/30 border-primary-500 text-primary-700 dark:text-primary-300'
+                                    : 'bg-white dark:bg-zinc-900 border-zinc-200 dark:border-zinc-700 text-zinc-600 dark:text-zinc-400 hover:bg-zinc-50 dark:hover:bg-zinc-800'
                                 }`}
                             >
                                 {num}
@@ -683,37 +710,44 @@ const App: React.FC = () => {
               </div>
           )}
 
-          <div className="pt-2">
-            <Button type="submit" isLoading={isGenerating} className="w-full h-14 text-lg font-bold shadow-xl shadow-indigo-500/20 rounded-2xl hover:shadow-indigo-500/40 transition-all">
-              {isGenerating ? 'Creating your content...' : 'Generate Study Material'}
+          <div className="pt-6">
+            <Button type="submit" isLoading={isGenerating} className="w-full h-16 text-xl font-bold shadow-2xl shadow-primary-500/25 rounded-2xl hover:shadow-primary-500/40 transition-all hover:-translate-y-1">
+              {isGenerating ? (
+                  <span className="flex items-center"><Sparkles className="w-6 h-6 mr-3 animate-pulse" /> Generating...</span>
+              ) : (
+                  <span className="flex items-center"><Zap className="w-6 h-6 mr-3 fill-current" /> Generate Material</span>
+              )}
             </Button>
           </div>
         </form>
 
         {error && (
-          <div className="mt-6 p-4 bg-red-50 dark:bg-red-900/20 border border-red-100 dark:border-red-900/50 rounded-xl text-red-600 dark:text-red-400 text-sm font-medium">
-            {error}
+          <div className="mt-8 p-5 bg-red-50 dark:bg-red-900/20 border border-red-100 dark:border-red-900/50 rounded-2xl text-red-600 dark:text-red-300 text-sm font-medium flex items-center">
+             <AlertCircle className="w-5 h-5 mr-3 flex-shrink-0" />
+             {error}
           </div>
         )}
       </div>
 
       {/* Result Display */}
       {currentResult && (
-        <div className="bg-white dark:bg-slate-800 rounded-3xl shadow-xl border border-slate-200 dark:border-slate-700 overflow-hidden animate-slide-up transition-colors duration-300">
-          <div className="bg-indigo-50/50 dark:bg-slate-900/50 px-8 py-5 border-b border-slate-100 dark:border-slate-700 flex justify-between items-center backdrop-blur-sm">
-            <h3 className="font-serif font-bold text-xl text-slate-900 dark:text-white">Result</h3>
+        <div className="glass-panel rounded-[2.5rem] shadow-2xl overflow-hidden animate-slide-up transition-colors duration-300">
+          <div className="bg-gradient-to-r from-zinc-50/50 to-zinc-100/50 dark:from-zinc-900 dark:to-zinc-900/50 px-10 py-8 border-b border-zinc-200/60 dark:border-white/5 flex justify-between items-center">
+            <h3 className="font-display font-bold text-2xl text-zinc-900 dark:text-white flex items-center">
+                <Sparkles className="w-6 h-6 mr-3 text-fuchsia-500" /> Result
+            </h3>
             <div className="flex items-center space-x-2">
                 {currentResult.config && (
-                    <span className="hidden sm:inline-flex text-xs text-slate-500 dark:text-slate-400 font-medium px-2 py-1 bg-slate-100 dark:bg-slate-700 rounded-lg">
+                    <span className="hidden sm:inline-flex text-xs text-zinc-600 dark:text-zinc-400 font-bold px-3 py-1.5 bg-white dark:bg-white/5 rounded-lg border border-zinc-200 dark:border-white/5 shadow-sm">
                         {currentResult.config.difficulty} • {currentResult.config.questionCount} {currentResult.goal === StudyGoal.QUIZ ? 'Qs' : 'Cards'}
                     </span>
                 )}
-                <span className="text-xs text-indigo-600 dark:text-indigo-400 font-bold uppercase tracking-wider bg-white dark:bg-slate-800 px-3 py-1.5 rounded-lg shadow-sm border border-indigo-100 dark:border-slate-700">
+                <span className="text-xs text-primary-700 dark:text-primary-300 font-bold uppercase tracking-wider bg-primary-100/80 dark:bg-primary-900/30 px-3 py-1.5 rounded-lg shadow-sm border border-primary-200 dark:border-primary-500/30">
                     {currentResult.goal}
                 </span>
             </div>
           </div>
-          <div className="p-6 sm:p-10">
+          <div className="p-10 sm:p-14 bg-white/40 dark:bg-transparent">
             {renderContent(currentResult)}
           </div>
         </div>
@@ -722,36 +756,36 @@ const App: React.FC = () => {
   );
 
   const renderHistory = () => (
-    <div className="max-w-4xl mx-auto px-4 py-8 font-sans">
-      <div className="mb-8 flex items-center justify-between">
+    <div className="max-w-5xl mx-auto px-4 py-12 font-sans relative z-10">
+      <div className="mb-10 flex items-center justify-between">
         <div>
-          <h2 className="text-3xl font-serif font-bold text-slate-900 dark:text-white">Library</h2>
-          <p className="text-slate-500 dark:text-slate-400 mt-1 font-medium">Your past learning sessions</p>
+          <h2 className="text-4xl font-display font-bold text-zinc-900 dark:text-white tracking-tight">Library</h2>
+          <p className="text-zinc-500 dark:text-zinc-400 mt-2 font-medium text-lg">Your knowledge collection</p>
           {(!isDbAvailable || user?.uid === 'guest-user') && (
-             <p className="text-indigo-600 dark:text-indigo-400 text-xs mt-2 flex items-center font-semibold">
-                <HistoryIcon className="w-3 h-3 mr-1" /> Saved locally (Offline Mode)
+             <p className="text-primary-700 dark:text-primary-400 text-xs mt-3 flex items-center font-bold bg-primary-100/80 dark:bg-primary-900/30 self-start inline-flex px-3 py-1.5 rounded-lg">
+                <HistoryIcon className="w-3.5 h-3.5 mr-1.5" /> Offline Mode
              </p>
           )}
         </div>
       </div>
 
       {isHistoryLoading ? (
-        <div className="flex justify-center py-12">
-          <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-indigo-500"></div>
+        <div className="flex justify-center py-32">
+          <div className="animate-spin rounded-full h-12 w-12 border-t-4 border-b-4 border-primary-500"></div>
         </div>
       ) : history.length === 0 ? (
-        <div className="text-center py-24 bg-white dark:bg-slate-800 rounded-3xl border border-dashed border-slate-300 dark:border-slate-700">
-          <div className="bg-slate-100 dark:bg-slate-700 w-20 h-20 rounded-full flex items-center justify-center mx-auto mb-6">
-            <HistoryIcon className="w-8 h-8 text-slate-400 dark:text-slate-500" />
+        <div className="text-center py-32 glass-panel rounded-[2rem] border-dashed border-2 border-zinc-300/60 dark:border-white/10">
+          <div className="bg-white dark:bg-white/5 w-24 h-24 rounded-full flex items-center justify-center mx-auto mb-6 shadow-sm">
+            <HistoryIcon className="w-10 h-10 text-zinc-400 dark:text-zinc-500" />
           </div>
-          <h3 className="text-xl font-serif font-bold text-slate-900 dark:text-white mb-2">No history yet</h3>
-          <p className="text-slate-500 dark:text-slate-400 mb-8 max-w-sm mx-auto leading-relaxed">Generated quizzes and study materials will appear here automatically.</p>
-          <Button onClick={() => setView('GENERATOR')} variant="primary" size="lg" className="rounded-xl font-bold">
+          <h3 className="text-2xl font-display font-bold text-zinc-900 dark:text-white mb-2">No history yet</h3>
+          <p className="text-zinc-500 dark:text-zinc-400 mb-10 max-w-md mx-auto text-lg">Generated study materials will appear here automatically.</p>
+          <Button onClick={() => setView('GENERATOR')} variant="primary" size="lg" className="rounded-2xl font-bold px-8">
             Create New Material
           </Button>
         </div>
       ) : (
-        <div className="grid grid-cols-1 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           {history.map((session) => (
             <div key={session.id} 
               onClick={() => {
@@ -760,31 +794,34 @@ const App: React.FC = () => {
                 setCurrentResult(session);
                 setView('GENERATOR');
               }}
-              className="group bg-white dark:bg-slate-800 rounded-2xl shadow-sm border border-slate-200 dark:border-slate-700 hover:border-indigo-400 dark:hover:border-indigo-500 cursor-pointer transition-all hover:shadow-lg p-6 flex items-start justify-between"
+              className="group glass-panel rounded-2xl hover:border-primary-300 dark:hover:border-primary-500 cursor-pointer transition-all duration-300 hover:shadow-xl hover:shadow-primary-500/5 p-6 flex flex-col justify-between hover:-translate-y-1 h-full bg-white/60 dark:bg-zinc-900/40"
             >
-              <div className="flex-1 min-w-0 mr-4">
-                <div className="flex items-center space-x-3 mb-3">
-                  <span className="text-xs font-bold text-indigo-700 dark:text-indigo-300 bg-indigo-100 dark:bg-indigo-900/40 px-2.5 py-1 rounded-md">
+              <div>
+                <div className="flex items-center space-x-3 mb-4">
+                  <span className="text-[10px] uppercase tracking-widest font-bold text-primary-700 dark:text-primary-300 bg-primary-50 dark:bg-primary-900/40 px-2.5 py-1 rounded-md border border-primary-100 dark:border-primary-800">
                     {session.goal}
                   </span>
-                  <span className="text-xs font-medium text-slate-400 dark:text-slate-500">
+                  <span className="text-xs font-medium text-zinc-400 dark:text-zinc-500">
                     {new Date(session.timestamp).toLocaleDateString()}
                   </span>
                 </div>
-                <h3 className="font-serif font-bold text-slate-900 dark:text-white text-xl truncate group-hover:text-indigo-600 dark:group-hover:text-indigo-400 transition-colors mb-2">{session.topic}</h3>
-                <p className="text-slate-500 dark:text-slate-400 text-sm leading-relaxed line-clamp-2">
+                <h3 className="font-display font-bold text-zinc-900 dark:text-white text-xl leading-tight group-hover:text-primary-600 dark:group-hover:text-primary-400 transition-colors mb-3 line-clamp-2">{session.topic}</h3>
+                <p className="text-zinc-500 dark:text-zinc-400 text-sm leading-relaxed line-clamp-3 font-medium">
                   {(session.goal === StudyGoal.QUIZ || session.goal === StudyGoal.FLASHCARDS) 
                     ? `${session.goal === StudyGoal.QUIZ ? 'Interactive Quiz' : 'Flashcard Set'} - Click to view content` 
                     : session.result.replace(/[#*`]/g, '').substring(0, 160)}
                 </p>
               </div>
-              <button 
-                onClick={(e) => handleDeleteHistory(session.id, e)}
-                className="text-slate-300 dark:text-slate-600 hover:text-red-500 dark:hover:text-red-400 p-2 rounded-xl hover:bg-red-50 dark:hover:bg-red-900/20 transition-all opacity-0 group-hover:opacity-100"
-                title="Delete"
-              >
-                <Trash2 className="w-5 h-5" />
-              </button>
+              
+              <div className="mt-4 pt-4 border-t border-zinc-100 dark:border-white/5 flex justify-end">
+                  <button 
+                    onClick={(e) => handleDeleteHistory(session.id, e)}
+                    className="text-zinc-300 dark:text-zinc-600 hover:text-red-500 dark:hover:text-red-400 p-2 rounded-lg hover:bg-red-50 dark:hover:bg-red-900/20 transition-all"
+                    title="Delete"
+                  >
+                    <Trash2 className="w-4 h-4" />
+                  </button>
+              </div>
             </div>
           ))}
         </div>
@@ -797,7 +834,8 @@ const App: React.FC = () => {
   }
 
   return (
-    <div className="min-h-screen bg-slate-50 dark:bg-slate-900 pb-12 transition-colors duration-300 font-sans">
+    <div className="min-h-screen text-zinc-900 dark:text-zinc-100 font-sans relative overflow-x-hidden">
+      <BackgroundAnimation />
       {renderHeader()}
       {view === 'GENERATOR' ? renderGenerator() : renderHistory()}
     </div>

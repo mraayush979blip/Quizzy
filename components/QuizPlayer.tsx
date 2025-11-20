@@ -91,55 +91,57 @@ const QuizPlayer: React.FC<QuizPlayerProps> = ({ data, onRestart }) => {
   if (showSummary) {
     const percentage = Math.round((score / questions.length) * 100);
     const radius = 60;
-    const circumference = 2 * Math.PI * radius; // ~377
+    const circumference = 2 * Math.PI * radius;
     
     return (
       <div className="animate-fade-in font-sans">
         {/* Score Header */}
         <div className="text-center mb-10">
-          {/* Centering Wrapper - using w-40/h-40 for good visibility and mx-auto for centering */}
-          <div className="relative w-40 h-40 mx-auto mb-6">
-            <svg className="w-full h-full transform -rotate-90" viewBox="0 0 128 128">
+          <div className="relative w-48 h-48 mx-auto mb-8">
+            <svg className="w-full h-full transform -rotate-90 drop-shadow-2xl" viewBox="0 0 128 128">
+               <defs>
+                  <linearGradient id="progressGradient" x1="0%" y1="0%" x2="100%" y2="0%">
+                    <stop offset="0%" stopColor="#7c3aed" />
+                    <stop offset="100%" stopColor="#e879f9" />
+                  </linearGradient>
+               </defs>
                {/* Background Track */}
                <circle 
                   cx="64" cy="64" r={radius} 
                   stroke="currentColor" 
                   strokeWidth="8" 
                   fill="transparent" 
-                  className="text-slate-100 dark:text-slate-700" 
+                  className="text-zinc-100 dark:text-white/5" 
                />
                {/* Progress Circle */}
                <circle 
                   cx="64" cy="64" r={radius} 
-                  stroke="currentColor" 
+                  stroke={percentage >= 80 ? "url(#progressGradient)" : percentage >= 50 ? "#f59e0b" : "#ef4444"}
                   strokeWidth="8" 
                   fill="transparent" 
                   strokeDasharray={circumference}
                   strokeDashoffset={circumference - (circumference * percentage) / 100}
                   strokeLinecap="round"
-                  className={clsx(
-                      "transition-all duration-1000 ease-out",
-                      percentage >= 80 ? "text-green-500" : percentage >= 50 ? "text-amber-500" : "text-red-500"
-                  )} 
+                  className="transition-all duration-1000 ease-out"
                />
             </svg>
-            {/* Text Overlay */}
+            
             <div className="absolute inset-0 flex flex-col items-center justify-center">
-                <Trophy className={clsx("w-8 h-8 mb-1", percentage >= 60 ? "text-amber-500" : "text-slate-300")} />
-                <span className="text-3xl font-bold text-slate-900 dark:text-white">{percentage}%</span>
+                <Trophy className={clsx("w-10 h-10 mb-1 drop-shadow-md", percentage >= 60 ? "text-amber-400 fill-amber-400/20" : "text-zinc-300")} />
+                <span className="text-4xl font-bold text-zinc-900 dark:text-white tracking-tight">{percentage}%</span>
             </div>
           </div>
           
-          <h3 className="text-2xl font-serif font-bold text-slate-900 dark:text-white mb-2">
+          <h3 className="text-3xl font-display font-bold text-zinc-900 dark:text-white mb-2">
              {percentage === 100 ? "Perfect Score!" : percentage >= 80 ? "Great Job!" : "Keep Practicing!"}
           </h3>
-          <p className="text-slate-500 dark:text-slate-400">You answered {score} out of {questions.length} questions correctly.</p>
+          <p className="text-zinc-500 dark:text-zinc-400">You answered {score} out of {questions.length} questions correctly.</p>
         </div>
 
         {/* Detailed Review List */}
         <div className="space-y-6 mb-10">
-            <h4 className="text-lg font-bold text-slate-800 dark:text-slate-200 flex items-center border-b border-slate-200 dark:border-slate-700 pb-3">
-                <ListChecks className="w-5 h-5 mr-2" />
+            <h4 className="text-lg font-bold text-zinc-800 dark:text-zinc-200 flex items-center border-b border-zinc-200 dark:border-white/10 pb-4 uppercase tracking-wider text-sm">
+                <ListChecks className="w-5 h-5 mr-2 text-primary-500" />
                 Detailed Review
             </h4>
             
@@ -148,37 +150,37 @@ const QuizPlayer: React.FC<QuizPlayerProps> = ({ data, onRestart }) => {
                 const isCorrect = userAnswer === q.correctAnswer;
 
                 return (
-                    <div key={idx} className="bg-slate-50 dark:bg-slate-700/30 rounded-xl p-5 border border-slate-200 dark:border-slate-700">
-                        <div className="flex items-start mb-3">
+                    <div key={idx} className="bg-zinc-50/50 dark:bg-white/5 rounded-2xl p-6 border border-zinc-200 dark:border-white/5">
+                        <div className="flex items-start mb-4">
                             <span className={clsx(
-                                "flex-shrink-0 w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold mr-3 mt-0.5",
-                                isCorrect ? "bg-green-100 text-green-700 dark:bg-green-900 dark:text-green-300" : "bg-red-100 text-red-700 dark:bg-red-900 dark:text-red-300"
+                                "flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold mr-4 mt-0.5 border",
+                                isCorrect ? "bg-green-100 border-green-200 text-green-700 dark:bg-green-900/30 dark:border-green-800 dark:text-green-300" : "bg-red-100 border-red-200 text-red-700 dark:bg-red-900/30 dark:border-red-800 dark:text-red-300"
                             )}>
                                 {idx + 1}
                             </span>
-                            <div>
-                                <p className="font-semibold text-slate-900 dark:text-white mb-3">{q.question}</p>
+                            <div className="flex-1">
+                                <p className="font-semibold text-zinc-900 dark:text-white mb-3 text-lg">{q.question}</p>
                                 
-                                <div className="space-y-2 text-sm">
-                                    <div className="flex items-center">
-                                        <span className="w-24 text-slate-500 dark:text-slate-400 font-medium">Your Answer:</span>
-                                        <span className={clsx("font-medium", isCorrect ? "text-green-600 dark:text-green-400" : "text-red-600 dark:text-red-400")}>
+                                <div className="space-y-2 text-sm mb-4">
+                                    <div className="flex items-center p-2 rounded-lg bg-white dark:bg-black/20 border border-zinc-100 dark:border-white/5">
+                                        <span className="w-24 text-zinc-500 dark:text-zinc-400 font-medium uppercase text-xs tracking-wider">Your Answer</span>
+                                        <span className={clsx("font-bold", isCorrect ? "text-green-600 dark:text-green-400" : "text-red-600 dark:text-red-400")}>
                                             {userAnswer}
                                         </span>
-                                        {isCorrect ? <CheckCircle className="w-4 h-4 text-green-500 ml-2" /> : <XCircle className="w-4 h-4 text-red-500 ml-2" />}
+                                        {isCorrect ? <CheckCircle className="w-4 h-4 text-green-500 ml-auto" /> : <XCircle className="w-4 h-4 text-red-500 ml-auto" />}
                                     </div>
                                     {!isCorrect && (
-                                        <div className="flex items-center">
-                                            <span className="w-24 text-slate-500 dark:text-slate-400 font-medium">Correct:</span>
-                                            <span className="font-medium text-green-600 dark:text-green-400">
+                                        <div className="flex items-center p-2 rounded-lg bg-green-50 dark:bg-green-900/10 border border-green-100 dark:border-green-900/30">
+                                            <span className="w-24 text-zinc-500 dark:text-zinc-400 font-medium uppercase text-xs tracking-wider">Correct</span>
+                                            <span className="font-bold text-green-600 dark:text-green-400">
                                                 {q.correctAnswer}
                                             </span>
                                         </div>
                                     )}
                                 </div>
 
-                                <div className="mt-3 text-sm text-slate-600 dark:text-slate-300 bg-white dark:bg-slate-800 p-3 rounded-lg border border-slate-100 dark:border-slate-700/50">
-                                    <span className="font-bold text-slate-700 dark:text-slate-200">Explanation: </span>
+                                <div className="text-sm text-zinc-600 dark:text-zinc-300 bg-zinc-100/50 dark:bg-white/5 p-4 rounded-xl leading-relaxed">
+                                    <span className="font-bold text-primary-600 dark:text-primary-400 block mb-1">Explanation</span>
                                     {q.explanation}
                                 </div>
                             </div>
@@ -188,7 +190,7 @@ const QuizPlayer: React.FC<QuizPlayerProps> = ({ data, onRestart }) => {
             })}
         </div>
 
-        <Button onClick={restart} className="mx-auto w-full sm:w-auto px-8">
+        <Button onClick={restart} className="mx-auto w-full sm:w-auto px-10 shadow-xl shadow-primary-500/20">
           <RotateCcw className="w-4 h-4 mr-2" />
           Take Quiz Again
         </Button>
@@ -205,41 +207,41 @@ const QuizPlayer: React.FC<QuizPlayerProps> = ({ data, onRestart }) => {
   return (
     <div className="animate-fade-in">
       {/* Progress Bar */}
-      <div className="w-full bg-slate-100 dark:bg-slate-800 h-1.5 rounded-full mb-6">
+      <div className="w-full bg-zinc-100 dark:bg-white/10 h-2 rounded-full mb-8 overflow-hidden">
         <div 
-          className="bg-indigo-600 h-1.5 rounded-full transition-all duration-300 ease-out"
-          style={{ width: `${((currentIndex) / questions.length) * 100}%` }}
+          className="bg-gradient-to-r from-primary-500 to-fuchsia-500 h-2 rounded-full transition-all duration-500 ease-out shadow-[0_0_10px_rgba(139,92,246,0.5)]"
+          style={{ width: `${((currentIndex + 1) / questions.length) * 100}%` }}
         ></div>
       </div>
 
       {/* Question */}
-      <div className="mb-6">
-        <div className="text-xs font-medium text-slate-400 dark:text-slate-500 mb-2 uppercase tracking-wide">
+      <div className="mb-8">
+        <div className="text-xs font-bold text-zinc-400 dark:text-zinc-500 mb-3 uppercase tracking-widest">
           Question {currentIndex + 1} of {questions.length}
         </div>
-        <h3 className="text-xl font-semibold text-slate-900 dark:text-white leading-snug">
+        <h3 className="text-2xl md:text-3xl font-display font-bold text-zinc-900 dark:text-white leading-tight">
           {currentQuestion.question}
         </h3>
       </div>
 
       {/* Options */}
-      <div className="space-y-3 mb-6">
+      <div className="space-y-4 mb-8">
         {currentQuestion.options.map((option, idx) => {
           const isSelected = selectedOption === option;
           const isCorrectAnswer = option === currentQuestion.correctAnswer;
           
-          let statusClass = "border-slate-200 dark:border-slate-700 hover:border-indigo-400 dark:hover:border-indigo-500 hover:bg-slate-50 dark:hover:bg-slate-800";
+          let statusClass = "border-zinc-200 dark:border-white/10 hover:border-primary-400 dark:hover:border-primary-500 hover:bg-zinc-50 dark:hover:bg-white/5";
           
           if (isAnswered) {
             if (isCorrectAnswer) {
-              statusClass = "border-green-500 bg-green-50 dark:bg-green-900/20 text-green-800 dark:text-green-200";
+              statusClass = "border-green-500 bg-green-50 dark:bg-green-900/20 text-green-800 dark:text-green-200 shadow-lg shadow-green-500/10";
             } else if (isSelected) {
-              statusClass = "border-red-500 bg-red-50 dark:bg-red-900/20 text-red-800 dark:text-red-200";
+              statusClass = "border-red-500 bg-red-50 dark:bg-red-900/20 text-red-800 dark:text-red-200 shadow-lg shadow-red-500/10";
             } else {
-              statusClass = "border-slate-100 dark:border-slate-800 opacity-50";
+              statusClass = "border-zinc-100 dark:border-white/5 opacity-50 grayscale";
             }
           } else if (isSelected) {
-            statusClass = "border-indigo-600 bg-indigo-50 dark:bg-indigo-900/20 ring-1 ring-indigo-600";
+            statusClass = "border-primary-600 bg-primary-50 dark:bg-primary-900/20 ring-1 ring-primary-600 shadow-lg shadow-primary-500/10";
           }
 
           return (
@@ -248,21 +250,24 @@ const QuizPlayer: React.FC<QuizPlayerProps> = ({ data, onRestart }) => {
               onClick={() => handleOptionClick(option)}
               disabled={isAnswered}
               className={clsx(
-                "w-full text-left p-4 rounded-lg border transition-all duration-200 relative",
-                "text-slate-700 dark:text-slate-300 font-medium",
+                "w-full text-left p-5 rounded-2xl border-2 transition-all duration-200 relative group",
+                "text-zinc-700 dark:text-zinc-300 font-medium text-lg",
                 statusClass
               )}
             >
               <div className="flex items-center">
-                <span className="w-6 h-6 rounded-full border flex-shrink-0 mr-3 flex items-center justify-center text-xs font-bold">
+                <span className={clsx(
+                    "w-8 h-8 rounded-lg flex-shrink-0 mr-4 flex items-center justify-center text-sm font-bold transition-colors duration-200",
+                    isSelected ? "bg-primary-600 text-white" : "bg-zinc-100 dark:bg-white/10 text-zinc-500"
+                )}>
                   {String.fromCharCode(65 + idx)}
                 </span>
                 {option}
                 {isAnswered && isCorrectAnswer && (
-                  <CheckCircle className="w-5 h-5 text-green-500 ml-auto" />
+                  <CheckCircle className="w-6 h-6 text-green-500 ml-auto animate-pulse" />
                 )}
                 {isAnswered && isSelected && !isCorrectAnswer && (
-                  <XCircle className="w-5 h-5 text-red-500 ml-auto" />
+                  <XCircle className="w-6 h-6 text-red-500 ml-auto" />
                 )}
               </div>
             </button>
@@ -271,26 +276,29 @@ const QuizPlayer: React.FC<QuizPlayerProps> = ({ data, onRestart }) => {
       </div>
 
       {/* Explanation & Controls */}
-      <div className="min-h-[80px]">
+      <div className="min-h-[100px]">
         {isAnswered ? (
           <div className="animate-slide-up">
              <div className={clsx(
-               "p-4 rounded-lg mb-4 text-sm",
-               isCorrect ? "bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300" : "bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-300"
+               "p-6 rounded-2xl mb-6 text-base border backdrop-blur-md",
+               isCorrect ? "bg-green-50/80 border-green-200 text-green-900 dark:bg-green-900/30 dark:border-green-900/50 dark:text-green-100" : "bg-red-50/80 border-red-200 text-red-900 dark:bg-red-900/30 dark:border-red-900/50 dark:text-red-100"
              )}>
-               <p className="font-bold mb-1">{isCorrect ? "Correct!" : "Incorrect"}</p>
-               <p>{currentQuestion.explanation}</p>
+               <p className="font-bold mb-2 flex items-center uppercase tracking-wide text-xs">
+                   {isCorrect ? <CheckCircle className="w-4 h-4 mr-2"/> : <XCircle className="w-4 h-4 mr-2"/>}
+                   {isCorrect ? "Correct" : "Incorrect"}
+               </p>
+               <p className="leading-relaxed">{currentQuestion.explanation}</p>
              </div>
-             <Button onClick={handleNext} className="w-full">
+             <Button onClick={handleNext} className="w-full h-14 text-lg rounded-xl shadow-xl shadow-primary-500/20">
                {currentIndex === questions.length - 1 ? 'See Results' : 'Next Question'} 
-               <ArrowRight className="w-4 h-4 ml-2" />
+               <ArrowRight className="w-5 h-5 ml-2" />
              </Button>
           </div>
         ) : (
           <Button 
             onClick={handleSubmit} 
             disabled={!selectedOption} 
-            className="w-full"
+            className="w-full h-14 text-lg rounded-xl"
           >
             Submit Answer
           </Button>
