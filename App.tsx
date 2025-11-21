@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect, useRef } from 'react';
-import { BookOpen, History as HistoryIcon, LogOut, Sparkles, ArrowLeft, Trash2, Moon, Sun, BrainCircuit, Lock, Mail, AlertCircle, Settings, Copy, UserCircle, Upload, FileText, X, Check, Zap } from 'lucide-react';
-import { StudyGoal, StudySession, User, ViewState, Theme, Difficulty, FileData } from './types';
+import { BookOpen, History as HistoryIcon, LogOut, Sparkles, ArrowLeft, Trash2, Moon, Sun, BrainCircuit, Lock, Mail, AlertCircle, Settings, Copy, UserCircle, Upload, FileText, X, Check, Zap, BarChart3, TrendingUp, Award, Target } from 'lucide-react';
+import { StudyGoal, StudySession, User, ViewState, Theme, Difficulty, FileData, QuizAttempt } from './types';
 import { generateStudyContent } from './services/geminiService';
 import { STORAGE_KEY_THEME, STORAGE_KEY_HISTORY } from './constants';
 import Button from './components/Button';
@@ -9,7 +9,7 @@ import QuizPlayer from './components/QuizPlayer';
 import FlashcardPlayer from './components/FlashcardPlayer';
 import { auth, db } from './firebase';
 import { onAuthStateChanged, signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut } from 'firebase/auth';
-import { collection, addDoc, query, where, orderBy, onSnapshot, deleteDoc, doc, serverTimestamp } from 'firebase/firestore';
+import { collection, addDoc, query, where, orderBy, onSnapshot, deleteDoc, doc, serverTimestamp, updateDoc } from 'firebase/firestore';
 
 const App: React.FC = () => {
   const [user, setUser] = useState<User | null>(null);
@@ -293,7 +293,8 @@ const App: React.FC = () => {
         goal,
         result: generatedText,
         timestamp: Date.now(), 
-        config: (goal === StudyGoal.QUIZ || goal === StudyGoal.FLASHCARDS) ? { difficulty, questionCount } : undefined
+        config: (goal === StudyGoal.QUIZ || goal === StudyGoal.FLASHCARDS) ? { difficulty, questionCount } : undefined,
+        attempts: []
       };
 
       let id = 'temp-' + Date.now();
@@ -324,6 +325,37 @@ const App: React.FC = () => {
       setError(err.message || "An error occurred while generating content.");
     } finally {
       setIsGenerating(false);
+    }
+  };
+
+  // Handle Quiz Completion
+  const handleQuizComplete = async (score: number, total: number) => {
+    if (!currentResult || !user) return;
+
+    const newAttempt: QuizAttempt = {
+      timestamp: Date.now(),
+      score,
+      totalQuestions: total
+    };
+
+    // Create updated session object
+    const updatedSession: StudySession = {
+      ...currentResult,
+      attempts: [...(currentResult.attempts || []), newAttempt]
+    };
+
+    // Update Local State
+    setCurrentResult(updatedSession);
+    setHistory(prev => prev.map(s => s.id === updatedSession.id ? updatedSession : s));
+
+    // Update DB (if available)
+    if (user.uid !== 'guest-user' && isDbAvailable && db) {
+        try {
+            const sessionRef = doc(db, 'users', user.uid, 'history', updatedSession.id);
+            await updateDoc(sessionRef, { attempts: updatedSession.attempts });
+        } catch (err) {
+            console.error("Failed to update quiz score in DB", err);
+        }
     }
   };
 
@@ -371,7 +403,7 @@ const App: React.FC = () => {
   const renderContent = (session: StudySession) => {
     switch (session.goal) {
       case StudyGoal.QUIZ:
-        return <QuizPlayer data={session.result} onRestart={() => {}} />;
+        return <QuizPlayer data={session.result} onRestart={() => {}} onComplete={handleQuizComplete} />;
       case StudyGoal.FLASHCARDS:
         return <FlashcardPlayer data={session.result} />;
       default:
@@ -528,28 +560,26 @@ const App: React.FC = () => {
             {theme === 'light' ? <Moon size={20} /> : <Sun size={20} />}
           </button>
 
-          {view === 'GENERATOR' && (
+          <div className="hidden sm:flex space-x-2">
             <Button 
-              variant="ghost"
+              variant={view === 'HISTORY' ? 'secondary' : 'ghost'}
               size="sm"
               onClick={() => setView('HISTORY')}
-              className="hidden sm:inline-flex font-semibold"
+              className="font-semibold"
             >
               <HistoryIcon className="w-4 h-4 mr-2" />
               Library
             </Button>
-          )}
-          {view === 'HISTORY' && (
             <Button 
-              variant="ghost"
+              variant={view === 'PROGRESS' ? 'secondary' : 'ghost'}
               size="sm"
-              onClick={() => setView('GENERATOR')}
+              onClick={() => setView('PROGRESS')}
               className="font-semibold"
             >
-              <ArrowLeft className="w-4 h-4 mr-2" />
-              Back
+              <TrendingUp className="w-4 h-4 mr-2" />
+              Progress
             </Button>
-          )}
+          </div>
           
           <div className="h-8 w-px bg-zinc-200 dark:bg-white/10 mx-2"></div>
           
@@ -835,6 +865,131 @@ const App: React.FC = () => {
     </div>
   );
 
+  // PROGRESS DASHBOARD
+  const renderProgress = () => {
+    // Filter only quiz sessions
+    const quizSessions = history.filter(s => s.goal === StudyGoal.QUIZ && s.attempts && s.attempts.length > 0);
+    
+    // Calculate Stats
+    const totalAttempts = quizSessions.reduce((acc, s) => acc + (s.attempts?.length || 0), 0);
+    const avgScore = totalAttempts > 0 
+        ? Math.round(quizSessions.reduce((acc, s) => acc + (s.attempts?.reduce((sum, a) => sum + (a.score/a.totalQuestions), 0) || 0), 0) / totalAttempts * 100) 
+        : 0;
+
+    return (
+      <div className="max-w-5xl mx-auto px-4 py-12 font-sans relative z-10 animate-fade-in">
+        <div className="mb-10">
+            <h2 className="text-4xl font-display font-bold text-zinc-900 dark:text-white tracking-tight">Your Progress</h2>
+            <p className="text-zinc-500 dark:text-zinc-400 mt-2 font-medium text-lg">Track your quiz performance over time</p>
+        </div>
+
+        {/* Stats Grid */}
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-6 mb-12">
+            <div className="glass-panel p-6 rounded-2xl border-l-4 border-l-primary-500">
+                <div className="flex items-center justify-between mb-2">
+                    <h4 className="text-sm font-bold text-zinc-500 uppercase tracking-wider">Total Quizzes</h4>
+                    <BookOpen className="w-5 h-5 text-primary-500" />
+                </div>
+                <p className="text-4xl font-display font-bold text-zinc-900 dark:text-white">{totalAttempts}</p>
+            </div>
+            <div className="glass-panel p-6 rounded-2xl border-l-4 border-l-fuchsia-500">
+                <div className="flex items-center justify-between mb-2">
+                    <h4 className="text-sm font-bold text-zinc-500 uppercase tracking-wider">Avg. Accuracy</h4>
+                    <Target className="w-5 h-5 text-fuchsia-500" />
+                </div>
+                <p className="text-4xl font-display font-bold text-zinc-900 dark:text-white">{avgScore}%</p>
+            </div>
+             <div className="glass-panel p-6 rounded-2xl border-l-4 border-l-amber-500">
+                <div className="flex items-center justify-between mb-2">
+                    <h4 className="text-sm font-bold text-zinc-500 uppercase tracking-wider">Topics Studied</h4>
+                    <Award className="w-5 h-5 text-amber-500" />
+                </div>
+                <p className="text-4xl font-display font-bold text-zinc-900 dark:text-white">{quizSessions.length}</p>
+            </div>
+        </div>
+
+        {/* Quiz List */}
+        <div className="space-y-6">
+             {quizSessions.length === 0 ? (
+                <div className="text-center py-20 bg-zinc-50/50 dark:bg-white/5 rounded-3xl border-2 border-dashed border-zinc-200 dark:border-white/10">
+                    <BarChart3 className="w-12 h-12 text-zinc-300 mx-auto mb-4" />
+                    <p className="text-zinc-500 font-medium">Take some quizzes to see your progress here!</p>
+                </div>
+             ) : (
+                 quizSessions.map(session => {
+                     // Get latest attempt
+                     const latest = session.attempts![session.attempts!.length - 1];
+                     const latestPct = Math.round((latest.score / latest.totalQuestions) * 100);
+                     const bestAttempt = session.attempts!.reduce((max, curr) => (curr.score/curr.totalQuestions) > (max.score/max.totalQuestions) ? curr : max, session.attempts![0]);
+                     const bestPct = Math.round((bestAttempt.score / bestAttempt.totalQuestions) * 100);
+
+                     return (
+                        <div key={session.id} className="glass-panel rounded-2xl p-6 hover:border-primary-400 dark:hover:border-primary-500 transition-colors">
+                            <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
+                                <div className="flex-1">
+                                    <div className="flex items-center space-x-3 mb-2">
+                                        <span className="px-2 py-1 rounded bg-zinc-100 dark:bg-white/10 text-xs font-bold text-zinc-500 uppercase tracking-wider">
+                                            {session.config?.difficulty || 'Medium'}
+                                        </span>
+                                        <span className="text-xs text-zinc-400 font-medium">Last taken: {new Date(latest.timestamp).toLocaleDateString()}</span>
+                                    </div>
+                                    <h3 className="text-xl font-bold text-zinc-900 dark:text-white">{session.topic}</h3>
+                                    
+                                    {/* Attempts Mini-Graph */}
+                                    <div className="flex items-end space-x-1 h-12 mt-4">
+                                        {session.attempts!.slice(-10).map((attempt, i) => {
+                                            const pct = (attempt.score / attempt.totalQuestions) * 100;
+                                            return (
+                                                <div key={i} className="w-2 bg-zinc-200 dark:bg-white/10 rounded-t-sm relative group">
+                                                    <div 
+                                                        className={`absolute bottom-0 w-full rounded-t-sm transition-all ${pct >= 80 ? 'bg-green-400' : pct >= 50 ? 'bg-amber-400' : 'bg-red-400'}`}
+                                                        style={{ height: `${pct}%` }}
+                                                    ></div>
+                                                    {/* Tooltip */}
+                                                    <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-1 bg-black text-white text-[10px] px-2 py-1 rounded opacity-0 group-hover:opacity-100 whitespace-nowrap pointer-events-none">
+                                                        {Math.round(pct)}%
+                                                    </div>
+                                                </div>
+                                            )
+                                        })}
+                                    </div>
+                                </div>
+                                
+                                <div className="flex items-center space-x-8 border-t md:border-t-0 md:border-l border-zinc-100 dark:border-white/5 pt-4 md:pt-0 md:pl-8">
+                                    <div className="text-center">
+                                        <p className="text-xs text-zinc-400 font-bold uppercase tracking-wider mb-1">Latest</p>
+                                        <p className={`text-2xl font-display font-bold ${latestPct >= 80 ? 'text-green-500' : latestPct >= 50 ? 'text-amber-500' : 'text-red-500'}`}>
+                                            {latestPct}%
+                                        </p>
+                                    </div>
+                                    <div className="text-center">
+                                        <p className="text-xs text-zinc-400 font-bold uppercase tracking-wider mb-1">Best</p>
+                                        <p className="text-2xl font-display font-bold text-zinc-700 dark:text-white">
+                                            {bestPct}%
+                                        </p>
+                                    </div>
+                                    <Button 
+                                        size="sm"
+                                        onClick={() => {
+                                            setTopic(session.topic);
+                                            setGoal(session.goal);
+                                            setCurrentResult(session);
+                                            setView('GENERATOR');
+                                        }}
+                                    >
+                                        Retake
+                                    </Button>
+                                </div>
+                            </div>
+                        </div>
+                     )
+                 })
+             )}
+        </div>
+      </div>
+    );
+  };
+
   if (view === 'AUTH' && !user) {
     return renderAuth();
   }
@@ -843,7 +998,7 @@ const App: React.FC = () => {
     <div className="min-h-screen text-zinc-900 dark:text-zinc-100 font-sans relative overflow-x-hidden">
       <BackgroundAnimation />
       {renderHeader()}
-      {view === 'GENERATOR' ? renderGenerator() : renderHistory()}
+      {view === 'GENERATOR' ? renderGenerator() : view === 'PROGRESS' ? renderProgress() : renderHistory()}
     </div>
   );
 };

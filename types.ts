@@ -29,6 +29,12 @@ export interface Flashcard {
   back: string;
 }
 
+export interface QuizAttempt {
+  timestamp: number;
+  score: number;
+  totalQuestions: number;
+}
+
 export interface StudySession {
   id: string;
   topic: string;
@@ -36,6 +42,7 @@ export interface StudySession {
   result: string; // JSON string for quizzes/flashcards, plain text for others
   timestamp: number;
   config?: StudyConfig; // Optional config used to generate
+  attempts?: QuizAttempt[]; // History of scores for this specific generated content
 }
 
 export interface User {
@@ -44,7 +51,7 @@ export interface User {
   isAuthenticated: boolean;
 }
 
-export type ViewState = 'AUTH' | 'GENERATOR' | 'HISTORY';
+export type ViewState = 'AUTH' | 'GENERATOR' | 'HISTORY' | 'PROGRESS';
 
 export type Theme = 'light' | 'dark';
 

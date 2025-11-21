@@ -8,9 +8,10 @@ import clsx from 'clsx';
 interface QuizPlayerProps {
   data: string; // JSON string of QuizQuestion[]
   onRestart?: () => void;
+  onComplete?: (score: number, total: number) => void;
 }
 
-const QuizPlayer: React.FC<QuizPlayerProps> = ({ data, onRestart }) => {
+const QuizPlayer: React.FC<QuizPlayerProps> = ({ data, onRestart, onComplete }) => {
   const [questions, setQuestions] = useState<QuizQuestion[]>([]);
   const [currentIndex, setCurrentIndex] = useState(0);
   const [selectedOption, setSelectedOption] = useState<string | null>(null);
@@ -21,6 +22,13 @@ const QuizPlayer: React.FC<QuizPlayerProps> = ({ data, onRestart }) => {
   
   // Store user answers: Index -> Selected Option
   const [userAnswers, setUserAnswers] = useState<Record<number, string>>({});
+
+  // Effect to notify parent of completion only once when summary is shown
+  useEffect(() => {
+    if (showSummary && onComplete && questions.length > 0) {
+      onComplete(score, questions.length);
+    }
+  }, [showSummary]); // Only depend on showSummary to prevent re-firing
 
   useEffect(() => {
     try {
