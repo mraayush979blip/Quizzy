@@ -149,6 +149,10 @@ export const generateStudyContent = async ({
     // Pass the actual error message to the UI
     const msg = error.message || error.toString();
     
+    if (msg.includes("Generative Language API has not been used") || msg.includes("SERVICE_DISABLED")) {
+        throw new Error("The Gemini API is disabled. Please enable 'Generative Language API' in your Google Cloud Console.");
+    }
+
     if (msg.includes("404") || msg.includes("not found")) {
         throw new Error("Model not found. Check if the API Key has access to 'gemini-2.5-flash'.");
     }
