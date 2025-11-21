@@ -149,6 +149,10 @@ export const generateStudyContent = async ({
     // Pass the actual error message to the UI
     const msg = error.message || error.toString();
     
+    if (msg.includes("leaked") || msg.includes("compromised")) {
+        throw new Error("SECURITY ALERT: Google has detected that your API Key was leaked publicly and has blocked it. You MUST generate a NEW key in Google AI Studio and update your environment variables.");
+    }
+
     if (msg.includes("API_KEY_SERVICE_BLOCKED") || msg.includes("Requests to this API ... are blocked")) {
         throw new Error("Your API Key is restricted. Go to Google Cloud Console > Credentials, click your Key, and add 'Generative Language API' to the allowed list (or unrestrict the key).");
     }
