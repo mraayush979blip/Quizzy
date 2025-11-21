@@ -2,9 +2,6 @@ import { GoogleGenAI, Type, Schema } from "@google/genai";
 import { StudyGoal, Difficulty, FileData } from "../types";
 import { PROMPT_TEMPLATES } from "../constants";
 
-// Initialize the Gemini client
-const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
-
 interface GenerateOptions {
   topic: string;
   goal: StudyGoal;
@@ -20,6 +17,18 @@ export const generateStudyContent = async ({
   questionCount = 5,
   file
 }: GenerateOptions): Promise<string> => {
+  
+  // 1. Debugging & Validation
+  const apiKey = process.env.API_KEY;
+  
+  if (!apiKey || apiKey.length === 0 || apiKey.includes("undefined")) {
+      console.error("API Key check failed. Value:", apiKey);
+      throw new Error("API Key is missing. Please check your EdgeOne/Vercel Environment Variables (VITE_API_KEY).");
+  }
+
+  // 2. Initialize client lazily with the validated key
+  const ai = new GoogleGenAI({ apiKey });
+
   try {
     let instruction = PROMPT_TEMPLATES[goal];
     
@@ -95,7 +104,7 @@ export const generateStudyContent = async ({
         });
         
         const text = response.text;
-        if (!text) throw new Error("No content generated");
+        if (!text) throw new Error("No content generated from Gemini.");
         return text;
 
     } else {
@@ -134,8 +143,16 @@ export const generateStudyContent = async ({
         return text;
     }
 
-  } catch (error) {
-    console.error("Gemini API Error:", error);
-    throw new Error("Failed to generate content. Please try again.");
+  } catch (error: any) {
+    console.error("Gemini API Error Full Details:", error);
+    
+    // Pass the actual error message to the UI
+    const msg = error.message || error.toString();
+    
+    if (msg.includes("404") || msg.includes("not found")) {
+        throw new Error("Model not found. Check if the API Key has access to 'gemini-2.5-flash'.");
+    }
+    
+    throw new Error(msg);
   }
 };
