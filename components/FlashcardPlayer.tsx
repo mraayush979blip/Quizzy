@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Flashcard } from '../types';
 import { ChevronLeft, ChevronRight, RotateCcw, Layers, Keyboard } from 'lucide-react';

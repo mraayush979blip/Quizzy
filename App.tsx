@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useRef } from 'react';
 import { BookOpen, History as HistoryIcon, LogOut, Sparkles, Trash2, Moon, Sun, BrainCircuit, Lock, Mail, AlertCircle, Settings, UserCircle, Upload, FileText, X, Zap, BarChart3, TrendingUp, Award, Target } from 'lucide-react';
 import { StudyGoal, StudySession, User, ViewState, Theme, Difficulty, FileData, QuizAttempt } from './types';

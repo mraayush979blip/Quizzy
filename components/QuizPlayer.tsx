@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { QuizQuestion } from '../types';
 import { CheckCircle, XCircle, Trophy, ArrowRight, RotateCcw, ListChecks, AlertCircle } from 'lucide-react';

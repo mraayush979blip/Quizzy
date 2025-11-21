@@ -149,6 +149,10 @@ export const generateStudyContent = async ({
     // Pass the actual error message to the UI
     const msg = error.message || error.toString();
     
+    if (msg.includes("API_KEY_SERVICE_BLOCKED") || msg.includes("Requests to this API ... are blocked")) {
+        throw new Error("Your API Key is restricted. Go to Google Cloud Console > Credentials, click your Key, and add 'Generative Language API' to the allowed list (or unrestrict the key).");
+    }
+
     if (msg.includes("Generative Language API has not been used") || msg.includes("SERVICE_DISABLED")) {
         throw new Error("The Gemini API is disabled. Please enable 'Generative Language API' in your Google Cloud Console.");
     }
