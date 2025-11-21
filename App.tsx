@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect, useRef } from 'react';
-import { BookOpen, History as HistoryIcon, LogOut, Sparkles, ArrowLeft, Trash2, Moon, Sun, BrainCircuit, Lock, Mail, AlertCircle, Settings, Copy, UserCircle, Upload, FileText, X, Check, Zap, BarChart3, TrendingUp, Award, Target } from 'lucide-react';
+import { BookOpen, History as HistoryIcon, LogOut, Sparkles, Trash2, Moon, Sun, BrainCircuit, Lock, Mail, AlertCircle, Settings, UserCircle, Upload, FileText, X, Zap, BarChart3, TrendingUp, Award, Target } from 'lucide-react';
 import { StudyGoal, StudySession, User, ViewState, Theme, Difficulty, FileData, QuizAttempt } from './types';
 import { generateStudyContent } from './services/geminiService';
 import { STORAGE_KEY_THEME, STORAGE_KEY_HISTORY } from './constants';
@@ -9,7 +9,7 @@ import QuizPlayer from './components/QuizPlayer';
 import FlashcardPlayer from './components/FlashcardPlayer';
 import { auth, db } from './firebase';
 import { onAuthStateChanged, signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut } from 'firebase/auth';
-import { collection, addDoc, query, where, orderBy, onSnapshot, deleteDoc, doc, serverTimestamp, updateDoc } from 'firebase/firestore';
+import { collection, addDoc, query, orderBy, onSnapshot, deleteDoc, doc, updateDoc } from 'firebase/firestore';
 
 const App: React.FC = () => {
   const [user, setUser] = useState<User | null>(null);
